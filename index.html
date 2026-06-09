@@ -2168,7 +2168,7 @@ function novoJogo(meuId,divisao){
   var _timesOutra=_tbOutra.map(t=>({...t,elenco:[]})); // elenco vazio — só simula jogos
   var _tabelaOutra={};_tbOutra.forEach(t=>{_tabelaOutra[t.id]={v:0,e:0,d:0,gp:0,gc:0,pts:0};});
   var _calOutra=genCalendario(_tbOutra[0].id); // calendário genérico da outra divisão
-  G={tela:'hub',aba:'tecnico',subAba:{clube:'estadio',tabela:'classificacao',tecnico:'momento',elenco:'escalacao'},meuId,divisao:_div||1,times,rodada:1,temporada:1,anoTemporada:2026,calendario:genCalendario(meuId),tabela,timesOutra:_timesOutra,tabelaOutra:_tabelaOutra,calOutra:_calOutra,orcamento:(_div===2?CAIXAS_B[meuId]:CAIXAS[meuId])||(_div===2?3000000:30000000),titulares:[],formacao:'4-3-3',eventos:[],ultimaPartida:null,evIdx:0,mercado:genMercado(),timer:null,resFinalizado:false,negociando:null,estadio,financas:[],tecnico:{...TECNICO},historico:[],historicoPorTemp:[],conquistas:[],finMesSel:null,base:{nivel:1,investimento:0,talentos:[],proxRevelacao:8},indisponiveis:{},_slotAtivo:_slotSalvo,_demissaoProcessada:false,_satBaixa:0};
+  G={tela:'hub',aba:'tecnico',subAba:{clube:'estadio',tabela:'proxima',tecnico:'momento',elenco:'escalacao'},meuId,divisao:_div||1,times,rodada:1,temporada:1,anoTemporada:2026,calendario:genCalendario(meuId),tabela,timesOutra:_timesOutra,tabelaOutra:_tabelaOutra,calOutra:_calOutra,orcamento:(_div===2?CAIXAS_B[meuId]:CAIXAS[meuId])||(_div===2?3000000:30000000),titulares:[],formacao:'4-3-3',eventos:[],ultimaPartida:null,evIdx:0,mercado:genMercado(),timer:null,resFinalizado:false,negociando:null,estadio,financas:[],tecnico:{...TECNICO},historico:[],historicoPorTemp:[],conquistas:[],finMesSel:null,base:{nivel:1,investimento:0,talentos:[],proxRevelacao:8},indisponiveis:{},_slotAtivo:_slotSalvo,_demissaoProcessada:false,_satBaixa:0};
     autoEscalar();
   // Mostrar tela de importação antes do hub
   var mt2=G.times.find(function(t){return t.id===G.meuId;});
@@ -2564,6 +2564,48 @@ function baterPenalti(zona){
     +'</div></div>');
 }
 
+// ── PÊNALTI CONTRA: você escolhe o canto pro seu goleiro defender ──
+function _iaMostrarDefesaPenalti(ev){
+  _iaMostrarPenalti(ev, true);
+}
+function defenderPenalti(zona){
+  _iaRemoveOverlay();
+  var _evPen=G.eventos[G.evIdx-1];
+  var nomes={al:'alto esquerdo',ac:'alto centro',ar:'alto direito',bl:'baixo esquerdo',bc:'centro',br:'baixo direito'};
+  // Onde o adversário bateu (aleatório)
+  var batZones=['al','bl','ar','br','ac','bc'];
+  var bat=batZones[Math.floor(Math.random()*batZones.length)];
+  // Se o jogador não escolheu (deixou com o goleiro), o GK escolhe aleatório
+  var escolha = zona || batZones[Math.floor(Math.random()*batZones.length)];
+  // Chance base de o batedor converter
+  var probGol=0.78;
+  if(bat==='bc')probGol=0.60;
+  if(bat==='al'||bat==='ar')probGol=0.88;
+  // Se o goleiro foi no canto certo, cai muito a chance de gol (boa defesa)
+  if(escolha===bat)probGol-=0.55;
+  var converteu=Math.random()<probGol;
+  var msg,titulo,cor,bg;
+  if(!converteu){
+    // DEFENDEU (ou o batedor errou) — sem gol pro adversário
+    if(_evPen){_evPen._pendente=false;_evPen._penaltiPerdido=true;}
+    if(escolha===bat){msg='🧤 DEFENDAÇA! Você mandou o goleiro para o canto certo ('+nomes[bat]+') e ele espalmou! Que defesa!';}
+    else{msg='😅 O batedor isolou! A bola foi para fora — pênalti desperdiçado pelo adversário!';}
+    titulo='🧤 PÊNALTI DEFENDIDO!';cor='var(--grn)';bg='rgba(0,168,69,.1)';
+  } else {
+    // GOL do adversário
+    if(_evPen){_evPen._pendente=false;_evPen._penaltiPerdido=false;}
+    if(escolha===bat){msg='😞 Você foi no canto certo ('+nomes[bat]+') mas a batida foi forte demais! Gol do adversário.';}
+    else{msg='⚽ O adversário bateu no '+nomes[bat]+' e seu goleiro foi pro '+nomes[escolha]+'. Sem chance. Gol.';}
+    titulo='🔴 GOL DO ADVERSÁRIO';cor='var(--red)';bg='rgba(232,0,13,.08)';
+  }
+  render();
+  _iaAddOverlay('<div class="ia-overlay"><div class="ia-sheet">'
+    +'<div class="ia-title">'+titulo+'</div>'
+    +'<div class="ia-result" style="background:'+bg+';color:'+cor+'">'+msg+'</div>'
+    +'<button class="btn btn-ora" onclick="_iaRemoveOverlay();_iaResumir()">Continuar →</button>'
+    +'</div></div>');
+}
+
 function escolherAcao(id){
   _iaRemoveOverlay();
   var opt=IA_CHANCE_OPTS.find(function(o){return o.id===id;});
@@ -2594,7 +2636,7 @@ function escolherAcao(id){
     +'</div></div>');
 }
 
-function _iaMostrarPenalti(ev){
+function _iaMostrarPenalti(ev, modoDefesa){
   // ── SVG do gol ─────────────────────────────────────────────────────
   // ViewBox: 360 x 220. Perspectiva real, estádio noturno, rede com malha
   var W=360, H=220;
@@ -2766,10 +2808,10 @@ function _iaMostrarPenalti(ev){
     +'</svg>';
 
   _iaAddOverlay('<div class="ia-overlay" style="justify-content:flex-end"><div class="ia-sheet" style="padding:18px 16px 28px">'
-    +'<div class="ia-title" style="margin-bottom:2px">🟡 PÊNALTI!</div>'
-    +'<div class="ia-sub" style="margin-bottom:12px">'+ev.jogador+' na marca do cal. Onde vai bater?</div>'
+    +'<div class="ia-title" style="margin-bottom:2px">'+(modoDefesa?'🧤 DEFENDA O PÊNALTI!':'🟡 PÊNALTI!')+'</div>'
+    +'<div class="ia-sub" style="margin-bottom:12px">'+(modoDefesa?('O adversário vai bater. Para que canto seu goleiro pula?'):(ev.jogador+' na marca do cal. Onde vai bater?'))+'</div>'
     +svgStr
-    +'<button class="btn btn-wht" onclick="_iaRemoveOverlay();_iaResumir()">⏭️ Pular cobrança</button>'
+    +'<button class="btn btn-wht" onclick="_iaRemoveOverlay();'+(modoDefesa?'defenderPenalti(null)':'_iaResumir()')+'">'+(modoDefesa?'🎲 Deixar com o goleiro':'⏭️ Pular cobrança')+'</button>'
     +'</div></div>');
 
   // Delegação de eventos no SVG
@@ -2778,7 +2820,7 @@ function _iaMostrarPenalti(ev){
     if(first&&first.closest('svg')){
       first.closest('svg').addEventListener('click',function(e){
         var el=e.target.closest('[data-zone]');
-        if(el)baterPenalti(el.getAttribute('data-zone'));
+        if(el){ if(modoDefesa){defenderPenalti(el.getAttribute('data-zone'));}else{baterPenalti(el.getAttribute('data-zone'));} }
       });
     }
   },50);
@@ -3214,6 +3256,24 @@ function _iaTick(){
       },2200);
       return;
     }
+    if(ev.tipo==='penalti'&&ev.equipe!==meuLado){
+      clearInterval(G.timer);G.timer=null;
+      _subFechar();
+      ev._pendente=true; // esconder da timeline até ser defendido/sofrido
+      render();
+      var _penOvC=document.createElement('div');
+      _penOvC.style.cssText='position:fixed;inset:0;z-index:398;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+      _penOvC.innerHTML='<div style="font-size:44px">🧤</div>'+
+        '<div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:2px">PÊNALTI CONTRA!</div>'+
+        '<div style="font-size:15px;color:rgba(255,255,255,.7)">O adversário vai cobrar</div>'+
+        '<div style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px">Prepare seu goleiro...</div>';
+      document.body.appendChild(_penOvC);
+      setTimeout(function(){
+        _penOvC.remove();
+        _iaMostrarDefesaPenalti(ev);
+      },2200);
+      return;
+    }
     if(ev.tipo==='chance_ia'&&ev.equipe===meuLado){
       clearInterval(G.timer);G.timer=null;
       _subFechar();
@@ -3472,6 +3532,17 @@ function iniciarPartida(){
     if(gi>=0){
       ev[gi]={min:ev[gi].min,tipo:'penalti',equipe:meuLado,jogador:ev[gi].jogador,
         desc:'🟡 Pênalti! O árbitro aponta para a marca!'};
+    }
+  }
+
+  // 1b) PÊNALTI CONTRA — mesma lógica, quando o ADVERSÁRIO fez gol (você defende)
+  var advLado=(meuLado==='casa')?'fora':'casa';
+  if(og>0&&rng()<0.30){
+    var gic=-1;
+    for(var jc=0;jc<ev.length;jc++){if(ev[jc].tipo==='goal'&&ev[jc].equipe===advLado){gic=jc;break;}}
+    if(gic>=0){
+      ev[gic]={min:ev[gic].min,tipo:'penalti',equipe:advLado,jogador:ev[gic].jogador||(G.ultimaPartida.adv.abr+' '),
+        desc:'🔴 Pênalti para o adversário! O árbitro aponta para a marca!'};
     }
   }
 
@@ -4770,13 +4841,7 @@ function confirmarMudancaDivisao(){
   try{ _cloudSalvarJa(); }catch(e){}
   _fadeTransition(function(){
     G.tela='hub';render();
-    if(!G._primeiroJogo){
-      // Tutorial logo no início; presidente vem após fechar o tutorial
-      G._presidentePendente=true;
-      setTimeout(mostrarOnboarding,500);
-    } else {
-      setTimeout(mostrarPresidente,600);
-    }
+    setTimeout(mostrarPresidente,600);
   });
 }
 
@@ -6389,7 +6454,7 @@ function confirmarProxTemporada(reiniciar){
 
   G={
     tela:'hub',aba:'tecnico',
-    subAba:{clube:'estadio',tabela:'classificacao',tecnico:'momento',elenco:'escalacao'},
+    subAba:{clube:'estadio',tabela:'proxima',tecnico:'momento',elenco:'escalacao'},
     meuId:meuId,divisao:_divisaoAtual,
     times:times,timesOutra:_timesOutra,
     temporada:novaTemp,anoTemporada:novoAno,
@@ -6931,7 +6996,7 @@ function iniciarNovaTemporada(){
   var _historicoTecnico=G.historicoTecnico||[];
   var _slotAtivo=G._slotAtivo!=null?G._slotAtivo:0;
 
-  G={tela:'hub',aba:'tecnico',subAba:{clube:'estadio',tabela:'classificacao',tecnico:'momento',elenco:'escalacao'},
+  G={tela:'hub',aba:'tecnico',subAba:{clube:'estadio',tabela:'proxima',tecnico:'momento',elenco:'escalacao'},
     meuId:meuId,divisao:_divisaoAtual,times:times,timesOutra:_timesOutra.length?_timesOutra:((_divisaoAtual===2)?[...TB]:[...TB_B]),temporada:novaTemp,anoTemporada:novoAno,rodada:1,
     tabela:novaTabela,tabelaOutra:_tabelaOutra,calendario:genCalendario(meuId,G.times),resultadosRodadas:{},resultadosRodadasOutra:{},
     historico:[],historicoPorTemp:histTemp,eventos:[],ultimaPartida:null,
@@ -9081,10 +9146,19 @@ const ONB_SLIDES = [
 ];
 
 var _onbStep = 0;
+var _onbModoView = false; // true quando aberto via "Como Jogar" (não afeta _primeiroJogo)
 
 function mostrarOnboarding(){
   if(G._primeiroJogo)return; // só mostra uma vez
   G._primeiroJogo=true;
+  _onbModoView=false;
+  _onbStep=0;
+  _renderOnboarding();
+}
+
+// Abre o tutorial "Como Jogar" a qualquer momento (tela inicial), sem afetar o fluxo
+function abrirComoJogar(){
+  _onbModoView=true;
   _onbStep=0;
   _renderOnboarding();
 }
@@ -9160,6 +9234,7 @@ function _fecharOnboarding(){
     setTimeout(function(){el.remove();},300);
   }
   salvarJogo();
+  if(_onbModoView){ _onbModoView=false; return; }
   if(G._presidentePendente){
     G._presidentePendente=false;
     setTimeout(mostrarPresidente,400);
@@ -9241,6 +9316,8 @@ function render(){
       hc.appendChild(div);
     }
   }
+  // FAB "Completar Time" — mostra/esconde conforme a tela e a escalação
+  if(typeof _completarTimeFabSync==='function'){ try{ _completarTimeFabSync(); }catch(e){} }
 }
 
 function renderNeg(){
@@ -9313,8 +9390,9 @@ function renderNeg(){
 // Adaptado para pontos corridos: sem multiplayer, sem analytics.
 // Salva em TECNICO.* (padrão Boleiros) e vai para a tela 'selecionar'.
 function _onbInit(){
-  if(!G._onb) G._onb = {passo:0, nome:'', nascimento:'', gestao:'', tatico:''};
+  if(!G._onb) G._onb = {passo:0, nome:'', nascimento:'', nacionalidade:'Brasileiro', gestao:'', tatico:''};
   if (!('nascimento' in G._onb)) G._onb.nascimento = '';
+  if (!('nacionalidade' in G._onb)) G._onb.nacionalidade = 'Brasileiro';
 }
 function _onbAvancar(){
   _onbInit();
@@ -9333,6 +9411,8 @@ function _onbAvancar(){
   if(G._onb.passo === 1){
     var n = document.getElementById('onb-nasc');
     if(n) G._onb.nascimento = n.value || '';
+    var nac = document.getElementById('onb-nac');
+    if(nac) G._onb.nacionalidade = nac.value || 'Brasileiro';
   }
   if(G._onb.passo === 2 && !G._onb.gestao){
     showToast('🎯','Estilo de Gestão','Escolha um estilo de gestão para continuar.');
@@ -9344,13 +9424,13 @@ function _onbAvancar(){
   }
   if(G._onb.passo < 3){
     G._onb.passo++;
-    render();
+    _fadeTransition(function(){ render(); });
     return;
   }
   // Passo final — salvar perfil no padrão Boleiros
   TECNICO.nome = G._onb.nome;
   TECNICO.nascimento = G._onb.nascimento;
-  TECNICO.nacionalidade = TECNICO.nacionalidade || 'Brasileiro';
+  TECNICO.nacionalidade = G._onb.nacionalidade || 'Brasileiro';
   TECNICO.gestao = G._onb.gestao;
   TECNICO.tatico = G._onb.tatico || '4-3-3';
   TECNICO.icone = TECNICO.icone || 'avatar_14';
@@ -9369,9 +9449,11 @@ function _onbVoltar(){
     if (G._onb.passo === 1){
       var n = document.getElementById('onb-nasc');
       if(n) G._onb.nascimento = n.value || '';
+      var nac = document.getElementById('onb-nac');
+      if(nac) G._onb.nacionalidade = nac.value || 'Brasileiro';
     }
     G._onb.passo--;
-    render();
+    _fadeTransition(function(){ render(); });
   }
 }
 function _onbSelecionar(campo, valor){
@@ -9393,6 +9475,7 @@ function rOnboarding(){
   var passo = G._onb.passo;
   var nomeAtual = G._onb.nome || '';
   var nascAtual = G._onb.nascimento || '';
+  var nacAtual = G._onb.nacionalidade || 'Brasileiro';
   var TOTAL_PASSOS = 4;
 
   // Indicador de passo
@@ -9440,6 +9523,10 @@ function rOnboarding(){
       +   ' min="1920-01-01"'
       +   ' style="width:100%;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;padding:18px 18px;font-size:18px;font-weight:700;color:#fff;outline:none;text-align:center;font-family:Roboto Condensed,sans-serif;color-scheme:dark"'
       +   ' onfocus="this.style.borderColor=\'var(--ora)\'" onblur="this.style.borderColor=\'rgba(255,255,255,.15)\'">'
+      + '</div>'
+      + '<div style="margin-bottom:8px;margin-top:14px">'
+      +   '<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:8px;text-align:left">Nacionalidade</div>'
+      +   ('<select id="onb-nac" style="width:100%;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.15);border-radius:14px;padding:16px 18px;font-size:16px;font-weight:700;color:#fff;outline:none;font-family:Roboto Condensed,sans-serif;color-scheme:dark"><option value="Brasileiro">Brasileiro</option><option value="Argentino">Argentino</option><option value="Uruguaio">Uruguaio</option><option value="Colombiano">Colombiano</option><option value="Chileno">Chileno</option><option value="Paraguaio">Paraguaio</option><option value="Boliviano">Boliviano</option><option value="Peruano">Peruano</option><option value="Equatoriano">Equatoriano</option><option value="Venezuelano">Venezuelano</option><option value="Português">Português</option><option value="Espanhol">Espanhol</option><option value="Italiano">Italiano</option><option value="Francês">Francês</option><option value="Alemão">Alemão</option><option value="Inglês">Inglês</option><option value="Holandês">Holandês</option><option value="Belga">Belga</option><option value="Croata">Croata</option><option value="Sérvio">Sérvio</option><option value="Suíço">Suíço</option><option value="Austríaco">Austríaco</option><option value="Dinamarquês">Dinamarquês</option><option value="Sueco">Sueco</option><option value="Norueguês">Norueguês</option><option value="Escocês">Escocês</option><option value="Irlandês">Irlandês</option><option value="Grego">Grego</option><option value="Russo">Russo</option><option value="Polonês">Polonês</option><option value="Tcheco">Tcheco</option><option value="Húngaro">Húngaro</option><option value="Romeno">Romeno</option><option value="Búlgaro">Búlgaro</option><option value="Ucraniano">Ucraniano</option><option value="Turco">Turco</option><option value="Marroquino">Marroquino</option><option value="Senegalês">Senegalês</option><option value="Ganense">Ganense</option><option value="Costa-marfinense">Costa-marfinense</option><option value="Nigeriano">Nigeriano</option><option value="Camerounês">Camerounês</option><option value="Japonês">Japonês</option><option value="Coreano">Coreano</option><option value="Australiano">Australiano</option><option value="Norte-americano">Norte-americano</option><option value="Mexicano">Mexicano</option><option value="Costarriquenho">Costarriquenho</option><option value="Jamaicano">Jamaicano</option></select>').replace('value="'+nacAtual+'"','value="'+nacAtual+'" selected')
       + '</div>'
       + '<button onclick="document.getElementById(\'onb-nasc\').value=\'\';_onbAvancar()" style="display:block;margin:14px auto 0;background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:600;cursor:pointer;text-decoration:underline">Pular esta etapa</button>';
     btnVoltar = '<button onclick="_onbVoltar()" style="background:transparent;border:1.5px solid rgba(255,255,255,.15);border-radius:14px;padding:14px 20px;font-size:13px;font-weight:700;color:rgba(255,255,255,.7);cursor:pointer">←</button>';
@@ -9760,6 +9847,7 @@ function rMenu(){
         +(temJogoSalvo()?'<button class="btn btn-ora" style="margin-bottom:10px" onclick="abrirSlotModal(\'carregar\')">📂 &nbsp;Carregar Jogo</button>':'')
         +'<button class="btn btn-wht" onclick="novoJogoComSlot()">🆕 &nbsp;Novo Jogo</button>'
         +'<button class="btn btn-wht" style="margin-top:10px;font-size:12px;padding:10px;opacity:.85" onclick="abrirTelaPacotes()">📦 &nbsp;Pacotes da Comunidade</button>'
+        +'<button class="btn btn-wht" style="margin-top:10px;font-size:12px;padding:10px;opacity:.85" onclick="abrirComoJogar()">📖 &nbsp;Como Jogar</button>'
       +'</div>'
       +'<div class="menu-features">'
         +'<span class="menu-feat">Escalação</span>'
@@ -10296,9 +10384,9 @@ function rTabelaHub(){
   const sa=G.subAba.tabela||'classificacao';
   const mt=G.times.find(t=>t.id===G.meuId);
   const subTabs=`<div class="sub-tabs">
+    <button class="sub-tab ${sa==='proxima'?'on':''}" onclick="G.subAba.tabela='proxima';render()">⚽ Jogar</button>
     <button class="sub-tab ${sa==='classificacao'?'on':''}" onclick="G.subAba.tabela='classificacao';render()">📊 Tabela</button>
     <button class="sub-tab ${sa==='resultados'?'on':''}" onclick="G.subAba.tabela='resultados';render()">📋 Resultados</button>
-    <button class="sub-tab ${sa==='proxima'?'on':''}" onclick="G.subAba.tabela='proxima';render()">⚽ Próxima</button>
     <button class="sub-tab ${sa==='ouro'?'on':''}" onclick="G.subAba.tabela='ouro';render()">🏅 Campeões</button>
   </div>`;
   return subTabs+(sa==='proxima'?rProxima(mt):sa==='resultados'?rResultadosRodadas():sa==='ouro'?rLivroDeOuro():rBrasileiraoTab());
@@ -10551,6 +10639,9 @@ function rProxima(mt){
     _gt.gestao==='carismatico'?'var(--ora)':_gt.gestao==='disciplinador'?'var(--blu)':'var(--txt)';
 
   return `<div class="next-wrap">
+
+  <!-- Botão Jogar no topo (evita rolar até o fim) -->
+  <button class="btn btn-ora" onclick="iniciarPartida()" ${cnt<11?'disabled':''} style="width:100%;margin-bottom:12px">⚽ &nbsp;${cnt<11?'Complete o time para jogar':'Jogar Partida'}</button>
 
   <!-- Preview do jogo -->
   <div class="match-preview">
@@ -11055,6 +11146,56 @@ function getAvatarSrc(icone){
 
 // ── TELA DE CONQUISTA DESBLOQUEADA (visual portado da Copa, adaptado) ──
 // Preserva o conteúdo de texto atual (ALBUM do base); só troca a apresentação.
+// ── FAB "⚡ Completar Time" (portado da Copa, adaptado ao Brasileirão) ──
+// Botão flutuante que só aparece na tela de "próxima partida" do hub quando a
+// escalação está incompleta (titulares < 11) — situação típica após expulsões,
+// suspensões ou lesões que tiraram titulares. Ao clicar: roda autoEscalar()
+// pra preencher respeitando a formação e excluindo indisponíveis, e leva o
+// usuário pra aba Elenco pra revisar.
+function _completarTimeFabDeveAparecer(){
+  if(!G || G.tela !== 'hub') return false;
+  if(G.aba !== 'tabela') return false;
+  if(!G.subAba || G.subAba.tabela !== 'proxima') return false;
+  // Só aparece se a escalação está incompleta
+  return (G.titulares && G.titulares.length < 11);
+}
+function _completarTimeFabSync(){
+  var existente = document.getElementById('fab-completar-time');
+  if(!_completarTimeFabDeveAparecer()){
+    if(existente) existente.remove();
+    return;
+  }
+  if(existente) return; // já está na tela
+  var btn = document.createElement('button');
+  btn.id = 'fab-completar-time';
+  btn.type = 'button';
+  btn.onclick = _completarTimeClick;
+  btn.style.cssText = 'position:fixed;right:12px;bottom:74px;z-index:50;'
+    + 'background:rgba(10,22,40,.92);color:#fff;'
+    + 'border:1.5px solid var(--ora);border-radius:999px;'
+    + 'padding:8px 14px;font-size:13px;font-weight:700;'
+    + 'font-family:inherit;cursor:pointer;'
+    + 'box-shadow:0 4px 14px rgba(0,0,0,.35);'
+    + 'display:flex;align-items:center;gap:6px;'
+    + '-webkit-tap-highlight-color:transparent';
+  btn.innerHTML = '<span style="font-size:14px">⚡</span><span>Completar Time</span>';
+  document.body.appendChild(btn);
+}
+function _completarTimeClick(){
+  if(typeof autoEscalar !== 'function'){ return; }
+  autoEscalar();
+  var cnt = (G.titulares||[]).length;
+  if(cnt === 11){
+    showToast('✅','Escalação completa','11/11 — revise no Elenco se quiser.');
+  } else {
+    showToast('⚠️','Escalação parcial', cnt + '/11 — elenco com poucos disponíveis.');
+  }
+  G.aba = 'elenco';
+  if(!G.subAba) G.subAba = {};
+  G.subAba.elenco = 'escalacao';
+  render();
+}
+
 function showConquista(conquista, totalFila, idxFila, onProxima, onAnterior){
   var old = document.getElementById('conquista-overlay');
   if (old) old.remove();
